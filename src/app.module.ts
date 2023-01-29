@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ServiceBusModule } from './service-bus/service-bus.module';
+import { RmqModule } from './rmq/service-bus.module';
 
 @Module({
-  imports: [ServiceBusModule],
+  imports: [RmqModule],
   controllers: [AppController],
   providers: [AppService],
 })
