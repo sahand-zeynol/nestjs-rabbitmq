@@ -1,4 +1,4 @@
 export enum ChannelType {
-	CONSUMER = 'consumer',
-	PUBLISHER = 'publisher'
+  CONSUMER = 'consumer',
+  PUBLISHER = 'publisher',
 }

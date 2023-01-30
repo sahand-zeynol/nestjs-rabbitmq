@@ -1,12 +1,14 @@
 import { Channel, ConfirmChannel, connect, Connection } from 'amqplib';
 import { v4 as uuid } from 'uuid';
 import { QueueDto, QueueWithExchangeDto } from './dtos';
-import { Cache } from 'cache-manager';
+// import { Cache } from 'cache-manager';
 import { CACHE_MANAGER, Inject, Injectable } from '@nestjs/common';
 import { CHANNELS, EXCHANGES, QUEUES } from './rabbitmq.config';
 import { ChannelType } from './types/channel.types';
 import { IQueueWithExchange } from './interfaces/publishOption.interface';
 import { delay } from './helpers';
+import { ConfigService } from '@nestjs/config';
+import { EnvironmentVariables } from './interfaces/EnvironmentVariables.interface';
 
 @Injectable()
 export class RmqService {
@@ -22,7 +24,13 @@ export class RmqService {
    * Constructor
    * @param cacheManager
    */
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+  constructor(
+    // @Inject(CACHE_MANAGER) private cacheManager: Cache
+    private configService: ConfigService<EnvironmentVariables>,
+  ) {
+    const port = this.configService.get('PORT', { infer: true });
+    console.log(port);
+  }
 
   /**
    * Connect
@@ -208,7 +216,7 @@ export class RmqService {
   async publish(
     queue: QueueDto | QueueWithExchangeDto,
     payload,
-    options?: {} | IQueueWithExchange,
+    options?: object | IQueueWithExchange,
   ) {
     if (queue.hasOwnProperty('EXCHANGE')) {
       await this.publisher(
@@ -241,10 +249,10 @@ export class RmqService {
               QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
               Buffer.from(
                 JSON.stringify([
-                  new UnhandledException('ServiceBusService', 'sendToQueue', {
-                    payload,
-                    err,
-                  }),
+                  // new UnhandledException('ServiceBusService', 'sendToQueue', {
+                  //   payload,
+                  //   err,
+                  // }),
                 ]),
               ),
             );
@@ -255,10 +263,10 @@ export class RmqService {
         QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
         Buffer.from(
           JSON.stringify([
-            new UnhandledException('ServiceBusService', 'sendToQueue', {
-              payload,
-              err,
-            }),
+            // new UnhandledException('ServiceBusService', 'sendToQueue', {
+            //   payload,
+            //   err,
+            // }),
           ]),
         ),
       );
@@ -297,10 +305,10 @@ export class RmqService {
               QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
               Buffer.from(
                 JSON.stringify([
-                  new UnhandledException('ServiceBusService', 'publisher', {
-                    payload,
-                    err,
-                  }),
+                  // new UnhandledException('ServiceBusService', 'publisher', {
+                  //   payload,
+                  //   err,
+                  // }),
                 ]),
               ),
             );
@@ -311,10 +319,10 @@ export class RmqService {
         QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
         Buffer.from(
           JSON.stringify([
-            new UnhandledException('ServiceBusService', 'publisher', {
-              payload,
-              err,
-            }),
+            // new UnhandledException('ServiceBusService', 'publisher', {
+            //   payload,
+            //   err,
+            // }),
           ]),
         ),
       );
@@ -341,20 +349,20 @@ export class RmqService {
           await handler(content);
           await channel.ack(result);
         } catch (error) {
-          const consumeErrorCount = await this.cacheManager.get(
-            result.properties.messageId,
-          );
-          if (consumeErrorCount > 5) {
-            // todo: Review this part, check if we wait for result then something fucking bad happens in the consumer!!!
-            await this.sendToQueue(QUEUES.PUBLISHER.ERRORS, result);
-            await channel.ack(result);
-          } else {
-            await this.cacheManager.set(
-              result.properties.messageId,
-              +consumeErrorCount + 1,
-            );
-            await channel.nack(result, false, false);
-          }
+          // const consumeErrorCount = await this.cacheManager.get(
+          //   result.properties.messageId,
+          // );
+          // if (consumeErrorCount > 5) {
+          //   // todo: Review this part, check if we wait for result then something fucking bad happens in the consumer!!!
+          //   await this.sendToQueue(QUEUES.PUBLISHER.ERRORS, result);
+          //   await channel.ack(result);
+          // } else {
+          //   await this.cacheManager.set(
+          //     result.properties.messageId,
+          //     +consumeErrorCount + 1,
+          //   );
+          //   await channel.nack(result, false, false);
+          // }
         }
       });
     } catch (error) {

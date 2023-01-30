@@ -1,7 +1,7 @@
 export interface IQueueHeaders {
-	durable: boolean;
+  durable: boolean;
 }
 
 export interface IQueueSingleActiveHeaders extends IQueueHeaders {
-	arguments: { 'x-single-active-consumer': boolean };
+  arguments: { 'x-single-active-consumer': boolean };
 }

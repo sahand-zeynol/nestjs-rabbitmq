@@ -1,4 +1,4 @@
 export enum ExchangeType {
-	DIRECT = 'direct',
-	DELAYED = 'x-delayed-message'
+  DIRECT = 'direct',
+  DELAYED = 'x-delayed-message',
 }

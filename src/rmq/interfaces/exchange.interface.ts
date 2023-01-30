@@ -1,11 +1,11 @@
 export interface IExchangeHeaders {
-	durable: boolean;
+  durable: boolean;
 }
 
 export interface ISingleActiveExchangeHeaders extends IExchangeHeaders {
-	arguments: { 'x-single-active-consumer': boolean };
+  arguments: { 'x-single-active-consumer': boolean };
 }
 
 export interface IBunnyExchangeHeaders extends IExchangeHeaders {
-	arguments: { 'x-delayed-type': string };
+  arguments: { 'x-delayed-type': string };
 }
