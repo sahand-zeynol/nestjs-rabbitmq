@@ -1,27 +1,25 @@
 import { Channel, ConfirmChannel, connect, Connection, Options } from 'amqplib';
 import { v4 as uuid } from 'uuid';
 import { Injectable } from '@nestjs/common';
-import {
-  IPublish,
-  IQueueWithExchange,
-} from './interfaces/publishOption.interface';
-import {
-  channels,
-  consumers,
-  exchanges,
-  publishers,
-} from '../rabbitmq/rabbitmq.config';
 import { delay, isNil } from './helpers';
 import { IRMQOptions } from './rmq.service.options';
+import {
+  IChannel,
+  IExchange,
+  IPublish,
+  IQueueWithExchange,
+} from './interfaces';
 
 @Injectable()
 export class RmqService {
   private options: IRMQOptions;
   private connectionRetry: boolean;
   private connection: Connection;
-
+  private configChannels: { [key: string]: IChannel };
+  private configExchanges: { [key: string]: IExchange };
+  private configConsumers: { [key: string]: IPublish };
+  private configPublishers: { [key: string]: IPublish };
   private channels: { [key: string]: Channel | ConfirmChannel } = {};
-
   private handlers = {};
 
   /**
@@ -30,13 +28,18 @@ export class RmqService {
    */
   constructor(options: IRMQOptions) {
     this.options = options;
+    this.configChannels = options.channels;
+    this.configExchanges = options.exchanges;
+    this.configConsumers = options.consumers;
+    this.configPublishers = options.publishers;
+    this.connect();
   }
 
   /**
    * Connect
    * @param rabbitmqUrl
    */
-  async connect(rabbitmqUrl: string = process.env.RABBITMQ_URL) {
+  async connect(rabbitmqUrl: string = this.options.url) {
     try {
       if (this.connection) {
         return this.connection;
@@ -90,13 +93,13 @@ export class RmqService {
     try {
       await this.createChannels();
       // tslint:disable-next-line:forin
-      for (const queue in publishers) {
-        await this.channelAssertion(publishers[queue]);
+      for (const queue in this.configPublishers) {
+        await this.channelAssertion(this.configPublishers[queue]);
       }
       // tslint:disable-next-line:forin
-      for (const queue in consumers) {
-        await this.channelAssertion(consumers[queue]);
-        await this.consumer(consumers[queue]);
+      for (const queue in this.configConsumers) {
+        await this.channelAssertion(this.configConsumers[queue]);
+        await this.consumer(this.configConsumers[queue]);
       }
     } catch (error) {
       console.error('Error while initializing =>', error.message);
@@ -109,10 +112,10 @@ export class RmqService {
    * create all channels
    */
   private async createChannels() {
-    for (const key in channels) {
-      if (channels[key].type === 'consumer') {
+    for (const key in this.configChannels) {
+      if (this.configChannels[key].type === 'consumer') {
         this.channels[key] = await this.createChannel(key);
-      } else if (channels[key].type === 'publisher') {
+      } else if (this.configChannels[key].type === 'publisher') {
         this.channels[key] = await this.createConfirmedChannel(key);
       }
     }
@@ -170,7 +173,7 @@ export class RmqService {
       }
 
       const createdChannel = await this.connection.createChannel();
-      createdChannel.prefetch(channels[channelName].prefetch);
+      createdChannel.prefetch(this.configChannels[channelName].prefetch);
       // On error
       createdChannel.on('error', (error) => {
         console.error(
@@ -298,11 +301,11 @@ export class RmqService {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
     let headers: { [k: string]: any } = {};
     switch (queue.QUEUE.EXCHANGE.type) {
-      case exchanges.BUNNY.type: {
+      case this.configExchanges.BUNNY.type: {
         headers = { 'x-delay': delayTime };
         break;
       }
-      case exchanges.SINGLE_ACTIVE.type: {
+      case this.configExchanges.SINGLE_ACTIVE.type: {
         headers = { 'x-single-active-consumer': true };
         break;
       }
