@@ -1,19 +1,23 @@
-import { Channel, ConfirmChannel, connect, Connection } from 'amqplib';
+import { Channel, ConfirmChannel, connect, Connection, Options } from 'amqplib';
 import { v4 as uuid } from 'uuid';
-import { QueueDto, QueueWithExchangeDto } from './dtos';
-// import { Cache } from 'cache-manager';
-import { CACHE_MANAGER, Inject, Injectable } from '@nestjs/common';
-import { CHANNELS, EXCHANGES, QUEUES } from './rabbitmq.config';
-import { ChannelType } from './types/channel.types';
-import { IQueueWithExchange } from './interfaces/publishOption.interface';
-import { delay } from './helpers';
-import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables } from './interfaces/EnvironmentVariables.interface';
+import { Injectable } from '@nestjs/common';
+import {
+  IPublish,
+  IQueueWithExchange,
+} from './interfaces/publishOption.interface';
+import {
+  channels,
+  consumers,
+  exchanges,
+  publishers,
+} from '../rabbitmq/rabbitmq.config';
+import { delay, isNil } from './helpers';
+import { IRMQOptions } from './rmq.service.options';
 
 @Injectable()
 export class RmqService {
+  private options: IRMQOptions;
   private connectionRetry: boolean;
-
   private connection: Connection;
 
   private channels: { [key: string]: Channel | ConfirmChannel } = {};
@@ -24,12 +28,8 @@ export class RmqService {
    * Constructor
    * @param cacheManager
    */
-  constructor(
-    // @Inject(CACHE_MANAGER) private cacheManager: Cache
-    private configService: ConfigService<EnvironmentVariables>,
-  ) {
-    const port = this.configService.get('PORT', { infer: true });
-    console.log(port);
+  constructor(options: IRMQOptions) {
+    this.options = options;
   }
 
   /**
@@ -38,7 +38,10 @@ export class RmqService {
    */
   async connect(rabbitmqUrl: string = process.env.RABBITMQ_URL) {
     try {
-      if (this.connection) return this.connection;
+      if (this.connection) {
+        return this.connection;
+      }
+
       this.connection = await connect(rabbitmqUrl);
       this.connectionRetry = true;
 
@@ -74,28 +77,31 @@ export class RmqService {
       return true;
     }
     this.connectionRetry = false;
-    return this.connection.close();
+    const res = await this.connection.close();
+    this.connection = null;
+    this.channels = {};
+    return res;
   }
 
   /**
-   * Initialize the RabbitMQ channels and consumers
+   * Initialize
    */
   private async init() {
     try {
       await this.createChannels();
-      for (const queue in QUEUES.CONSUMER) {
-        await this.channelAssertQueue(
-          QUEUES.CONSUMER[queue] as QueueWithExchangeDto,
-        );
-        await this.consumer(QUEUES.CONSUMER[queue]);
+      // tslint:disable-next-line:forin
+      for (const queue in publishers) {
+        await this.channelAssertion(publishers[queue]);
       }
-      for (const queue in QUEUES.PUBLISHER) {
-        await this.channelAssertQueue(
-          QUEUES.PUBLISHER[queue] as QueueWithExchangeDto,
-        );
+      // tslint:disable-next-line:forin
+      for (const queue in consumers) {
+        await this.channelAssertion(consumers[queue]);
+        await this.consumer(consumers[queue]);
       }
     } catch (error) {
       console.error('Error while initializing =>', error.message);
+      await this.closeConnection();
+      throw new Error(error);
     }
   }
 
@@ -103,17 +109,17 @@ export class RmqService {
    * create all channels
    */
   private async createChannels() {
-    for (const key in CHANNELS) {
-      if (CHANNELS[key].type === ChannelType.CONSUMER) {
+    for (const key in channels) {
+      if (channels[key].type === 'consumer') {
         this.channels[key] = await this.createChannel(key);
-      } else if (CHANNELS[key].type === ChannelType.PUBLISHER) {
+      } else if (channels[key].type === 'publisher') {
         this.channels[key] = await this.createConfirmedChannel(key);
       }
     }
   }
 
   /**
-   * Retry to connect to the message broker
+   * Retry connect
    */
   private async retryConnect() {
     try {
@@ -130,8 +136,9 @@ export class RmqService {
    */
   private async createConfirmedChannel(channelName): Promise<ConfirmChannel> {
     try {
-      if (this.channels[channelName])
+      if (this.channels[channelName]) {
         return this.channels[channelName] as ConfirmChannel;
+      }
 
       const confirmedChannel = await this.connection.createConfirmChannel();
 
@@ -148,6 +155,7 @@ export class RmqService {
       return confirmedChannel;
     } catch (error) {
       console.error('[AMQP] confirmed channel error =>', error.message);
+      throw new Error(error);
     }
   }
 
@@ -157,10 +165,12 @@ export class RmqService {
    */
   private async createChannel(channelName): Promise<Channel> {
     try {
-      if (this.channels[channelName]) return this.channels[channelName];
-      const createdChannel = await this.connection.createChannel();
+      if (this.channels[channelName]) {
+        return this.channels[channelName];
+      }
 
-      createdChannel.prefetch(CHANNELS[channelName].prefetch);
+      const createdChannel = await this.connection.createChannel();
+      createdChannel.prefetch(channels[channelName].prefetch);
       // On error
       createdChannel.on('error', (error) => {
         console.error(
@@ -173,9 +183,11 @@ export class RmqService {
       createdChannel.on('close', () => {
         console.log(`[AMQP] channel ${channelName} closed`);
       });
+
       return createdChannel;
     } catch (error) {
       console.error(`[AMQP] channel ${channelName} error =>`, error.message);
+      throw new Error(error);
     }
   }
 
@@ -183,25 +195,34 @@ export class RmqService {
    * Channel assert exchange and queue and bind them
    * @param queue
    */
-  private async channelAssertQueue(queue: QueueWithExchangeDto) {
+  private async channelAssertion(queue: IPublish) {
     try {
-      if (!queue.EXCHANGE || !queue.CHANNEL_NAME) {
+      const channel = this.channels[queue.CHANNEL_NAME];
+      const { QUEUE } = queue;
+      if (!queue.CHANNEL_NAME) {
         return;
       }
-      const channel = this.channels[queue.CHANNEL_NAME];
-      await channel.assertExchange(
-        queue.EXCHANGE.name,
-        queue.EXCHANGE.type,
-        queue.EXCHANGE.headers,
-      );
-      await channel.assertQueue(queue.QUEUE_NAME, queue.HEADERS);
-      await channel.bindQueue(
-        queue.QUEUE_NAME,
-        queue.EXCHANGE.name,
-        queue.QUEUE_NAME,
-      );
+
+      await channel.assertQueue(QUEUE.QUEUE_NAME, QUEUE.HEADERS);
+
+      if (QUEUE.EXCHANGE) {
+        await channel.assertExchange(
+          QUEUE.EXCHANGE.name,
+          QUEUE.EXCHANGE.type,
+          QUEUE.EXCHANGE.headers,
+        );
+        await channel.bindQueue(
+          QUEUE.QUEUE_NAME,
+          QUEUE.EXCHANGE.name,
+          QUEUE.QUEUE_NAME,
+        );
+      }
     } catch (error) {
-      console.error('Channel assert queue error =>', error.message);
+      console.error(
+        `Channel assert queue ${queue.QUEUE.QUEUE_NAME} error =>`,
+        error.message,
+      );
+      throw new Error(error);
     }
   }
 
@@ -211,22 +232,22 @@ export class RmqService {
    * .If queue doesn't have exchange will send by sendToQueue function
    * @param queue
    * @param payload
-   * @param delayTime
+   * @param options
    */
   async publish(
-    queue: QueueDto | QueueWithExchangeDto,
+    queue: IPublish,
     payload,
     options?: object | IQueueWithExchange,
   ) {
-    if (queue.hasOwnProperty('EXCHANGE')) {
-      await this.publisher(
-        queue as QueueWithExchangeDto,
+    if (queue.QUEUE.hasOwnProperty('EXCHANGE')) {
+      return await this.publisher(
+        queue,
         payload,
         (options as IQueueWithExchange)?.delayTime,
       );
-    } else {
-      await this.sendToQueue(queue, payload);
     }
+
+    return await this.sendToQueue(queue, payload);
   }
 
   /**
@@ -234,43 +255,37 @@ export class RmqService {
    * @param queue
    * @param payload
    */
-  private async sendToQueue(queue: QueueDto, payload) {
+  private async sendToQueue(queue: IPublish, payload) {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
-    try {
+    const options: Options.Publish = {
+      messageId: uuid(),
+    };
+
+    return new Promise((resolve) => {
       confirmedChannel.sendToQueue(
-        queue.QUEUE_NAME,
+        queue.QUEUE.QUEUE_NAME,
         Buffer.from(JSON.stringify([payload])),
-        {
-          messageId: uuid(),
-        },
-        async (err) => {
-          if (err)
-            await confirmedChannel.sendToQueue(
-              QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
-              Buffer.from(
-                JSON.stringify([
-                  // new UnhandledException('ServiceBusService', 'sendToQueue', {
-                  //   payload,
-                  //   err,
-                  // }),
-                ]),
-              ),
-            );
+        options,
+        async (err, ok) => {
+          if (err) {
+            console.log(err);
+            // await confirmedChannel.sendToQueue(
+            //   PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE.QUEUE_NAME,
+            //   Buffer.from(
+            //     JSON.stringify([
+            //       new UnhandledException('ServiceBusService', 'sendToQueue', {
+            //         payload,
+            //         err,
+            //       }),
+            //     ]),
+            //   ),
+            // );
+          }
+
+          return resolve(ok);
         },
       );
-    } catch (err) {
-      await confirmedChannel.sendToQueue(
-        QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
-        Buffer.from(
-          JSON.stringify([
-            // new UnhandledException('ServiceBusService', 'sendToQueue', {
-            //   payload,
-            //   err,
-            // }),
-          ]),
-        ),
-      );
-    }
+    });
   }
 
   /**
@@ -279,95 +294,96 @@ export class RmqService {
    * @param payload
    * @param delayTime
    */
-  private async publisher(queue: QueueWithExchangeDto, payload, delayTime = 0) {
+  private async publisher(queue: IPublish, payload, delayTime = 0) {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
-    try {
-      // Headers
-      let headers: { [k: string]: any } = {};
-
-      if (queue.EXCHANGE.type === EXCHANGES.BUNNY.type) {
+    let headers: { [k: string]: any } = {};
+    switch (queue.QUEUE.EXCHANGE.type) {
+      case exchanges.BUNNY.type: {
         headers = { 'x-delay': delayTime };
-      } else if (queue.EXCHANGE.type === EXCHANGES.SINGLE_ACTIVE.type) {
-        headers = { 'x-single-active-consumer': true };
+        break;
       }
-      // Publish
+      case exchanges.SINGLE_ACTIVE.type: {
+        headers = { 'x-single-active-consumer': true };
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+
+    return new Promise((resolve) => {
       confirmedChannel.publish(
-        queue.EXCHANGE.name,
-        queue.QUEUE_NAME,
+        queue.QUEUE.EXCHANGE.name,
+        queue.QUEUE.QUEUE_NAME,
         Buffer.from(JSON.stringify([payload])),
         {
           messageId: uuid(),
           headers,
         },
-        async (err) => {
-          if (err)
-            await confirmedChannel.sendToQueue(
-              QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
-              Buffer.from(
-                JSON.stringify([
-                  // new UnhandledException('ServiceBusService', 'publisher', {
-                  //   payload,
-                  //   err,
-                  // }),
-                ]),
-              ),
-            );
+        async (err, ok) => {
+          if (err) {
+            console.log(err);
+            // await confirmedChannel.sendToQueue(
+            //   PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE.QUEUE_NAME,
+            //   Buffer.from(
+            //     JSON.stringify([
+            //       new UnhandledException('ServiceBusService', 'publisher', {
+            //         payload,
+            //         err,
+            //       }),
+            //     ]),
+            //   ),
+            // );
+          }
+
+          return resolve(ok);
         },
       );
-    } catch (err) {
-      await confirmedChannel.sendToQueue(
-        QUEUES.PUBLISHER.UNHANDLED_EXCEPTION_QUEUE.QUEUE_NAME,
-        Buffer.from(
-          JSON.stringify([
-            // new UnhandledException('ServiceBusService', 'publisher', {
-            //   payload,
-            //   err,
-            // }),
-          ]),
-        ),
-      );
-    }
+    });
   }
 
   /**
    * Consume
    * @param queue
    */
-  private async consumer(queue: QueueDto) {
-    try {
-      console.log('CONSUMING....', queue.QUEUE_NAME);
-      const channel = this.channels[queue.CHANNEL_NAME];
-      await channel.consume(queue.QUEUE_NAME, async (result) => {
-        const handler = this.handlers[queue.QUEUE_NAME];
-        if (result === null || handler === undefined) {
-          console.log(`no handler for ${queue.QUEUE_NAME} or result is null`);
+  private async consumer(queue: IPublish) {
+    console.log('CONSUMING....', queue.QUEUE.QUEUE_NAME);
+    const channel = this.channels[queue.CHANNEL_NAME];
+    if (!channel) {
+      throw new Error('Channel not found!');
+    }
+
+    await channel.consume(queue.QUEUE.QUEUE_NAME, async (result) => {
+      try {
+        const handler = this.handlers[queue.QUEUE.QUEUE_NAME];
+        if (isNil(result) || isNil(handler)) {
+          console.log(
+            `no handler for ${queue.QUEUE.QUEUE_NAME} or result is null`,
+          );
           return;
         }
 
-        try {
-          const content = JSON.parse(result.content.toString())[0];
-          await handler(content);
-          await channel.ack(result);
-        } catch (error) {
-          // const consumeErrorCount = await this.cacheManager.get(
-          //   result.properties.messageId,
-          // );
-          // if (consumeErrorCount > 5) {
-          //   // todo: Review this part, check if we wait for result then something fucking bad happens in the consumer!!!
-          //   await this.sendToQueue(QUEUES.PUBLISHER.ERRORS, result);
-          //   await channel.ack(result);
-          // } else {
-          //   await this.cacheManager.set(
-          //     result.properties.messageId,
-          //     +consumeErrorCount + 1,
-          //   );
-          //   await channel.nack(result, false, false);
-          // }
-        }
-      });
-    } catch (error) {
-      console.error('Consumer error =>', error.message);
-    }
+        const content = JSON.parse(result.content.toString())[0];
+        await handler(content);
+        await channel.ack(result);
+      } catch (error) {
+        console.log(error);
+        // const consumeErrorCount = await this.cacheManager.get(
+        //   result.properties.messageId,
+        // );
+        // if (consumeErrorCount > 5) {
+        //   // todo: Review this part, check if we wait for result then something fucking bad happens in the consumer!!!
+        //   await this.sendToQueue(PUBLISHER.ERRORS, result);
+        //   await channel.ack(result);
+        // } else {
+        //   await this.cacheManager.set(
+        //     result.properties.messageId,
+        //     +consumeErrorCount + 1,
+        //   );
+        //   await channel.nack(result, false, false);
+        // }
+      }
+    });
   }
 
   /**
@@ -375,11 +391,8 @@ export class RmqService {
    * @param queue
    * @param callback
    */
-  public on = (
-    queue: QueueDto | QueueWithExchangeDto,
-    callback: (result: any) => void,
-  ) => {
-    console.log(`new handler registered ${queue.QUEUE_NAME}`);
-    this.handlers[queue.QUEUE_NAME] = callback;
+  public on = (queue: IPublish, callback: (result: any) => void) => {
+    console.log(`new handler registered ${queue.QUEUE.QUEUE_NAME}`);
+    this.handlers[queue.QUEUE.QUEUE_NAME] = callback;
   };
 }

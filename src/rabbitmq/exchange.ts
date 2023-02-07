@@ -1,18 +1,16 @@
-// import { configService } from 'config/config.service';
-import { ExchangeType } from '../types/exchange.types';
+import { IExchange } from '../rmq/interfaces/exchange.interface';
 
-// const postfix = configService.getValue('RABBITMQ_POSTFIX');
 const postfix = '';
 
-export const EXCHANGES = {
+export const exchanges: { [key: string]: IExchange } = {
   BUNNY: {
     name: `bunny_delay_${postfix}`,
-    type: ExchangeType.DELAYED,
+    type: 'direct',
     headers: { durable: true, arguments: { 'x-delayed-type': 'direct' } },
   },
   SINGLE_ACTIVE: {
     name: `singleActive_${postfix}`,
-    type: ExchangeType.DIRECT,
+    type: 'x-delayed-message',
     headers: { durable: true, arguments: { 'x-single-active-consumer': true } },
   },
 };

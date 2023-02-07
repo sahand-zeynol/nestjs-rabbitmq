@@ -1,15 +1,3 @@
-export const getPropertyName = (obj, expression) => {
-  try {
-    const res = {};
-    Object.keys(obj).map((k) => {
-      res[k] = () => k;
-    });
-    return expression(res)();
-  } catch (e) {
-    throw new Error(`${expression} not found!`);
-  }
-};
-
 /**
  * Make delay
  *
@@ -20,3 +8,7 @@ export const getPropertyName = (obj, expression) => {
 export function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export const isUndefined = (val: any): boolean => typeof val === 'undefined';
+export const isNull = (val: any): boolean => val === null;
+export const isNil = (val: any): boolean => isUndefined(val) || isNull(val);

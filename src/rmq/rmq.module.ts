@@ -1,8 +1,21 @@
-import { Module } from '@nestjs/common';
+import { DynamicModule, Module } from '@nestjs/common';
 import { RmqService } from './rmq.service';
+import { IRMQOptions } from './rmq.service.options';
 
-@Module({
-  providers: [RmqService],
-  exports: [RmqService],
-})
-export class RmqModule {}
+@Module({})
+export class RmqModule {
+  static forRoot(options: IRMQOptions): DynamicModule {
+    const providers = [
+      {
+        provide: RmqService,
+        useValue: new RmqService(options),
+      },
+    ];
+
+    return {
+      providers: providers,
+      exports: providers,
+      module: RmqModule,
+    };
+  }
+}

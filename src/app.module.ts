@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RmqModule } from './rmq/rmq.module';
+import { RmqModule } from './rmq';
 import * as Joi from '@hapi/joi';
+import * as RMQConfig from './rabbitmq/rabbitmq.config';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import * as Joi from '@hapi/joi';
           .default('development'),
       }),
     }),
-    RmqModule,
+    RmqModule.forRoot(RMQConfig),
   ],
   controllers: [AppController],
   providers: [AppService],
