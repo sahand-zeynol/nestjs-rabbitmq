@@ -2,7 +2,7 @@ import { Channel, ConfirmChannel, connect, Connection, Options } from 'amqplib';
 import { v4 as uuid } from 'uuid';
 import { Injectable } from '@nestjs/common';
 import { delay, isNil } from './helpers';
-import { IRMQOptions } from './rmq.service.options';
+import { IRMQOptions } from './interfaces/rmq.service.options';
 import {
   IChannel,
   IExchange,
@@ -24,7 +24,7 @@ export class RmqService {
 
   /**
    * Constructor
-   * @param cacheManager
+   * @param options
    */
   constructor(options: IRMQOptions) {
     this.options = options;

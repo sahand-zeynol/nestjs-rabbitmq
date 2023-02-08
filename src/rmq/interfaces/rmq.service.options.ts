@@ -1,7 +1,7 @@
-import { IChannel } from './interfaces/channel.interface';
-import { IExchange } from './interfaces/exchange.interface';
-import { IPublish } from './interfaces/publishOption.interface';
-import { IQueue } from './interfaces/queue.interface';
+import { IChannel } from './channel.interface';
+import { IExchange } from './exchange.interface';
+import { IPublish } from './publishOption.interface';
+import { IQueue } from './queue.interface';
 
 export interface IRMQOptions {
   url: string;
