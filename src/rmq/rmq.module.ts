@@ -13,6 +13,7 @@ export class RmqModule {
     ];
 
     return {
+      global: options.isGlobal,
       providers: providers,
       exports: providers,
       module: RmqModule,

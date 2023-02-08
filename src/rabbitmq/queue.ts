@@ -1,5 +1,7 @@
-import { IQueue } from '../rmq/interfaces/queue.interface';
+import { IQueue } from 'nestjs-rabbitmq-sdk';
 import { exchanges } from './exchange';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const postfix = process.env.RABBITMQ_POSTFIX;
 

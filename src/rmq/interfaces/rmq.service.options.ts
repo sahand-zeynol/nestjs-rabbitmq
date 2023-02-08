@@ -10,4 +10,5 @@ export interface IRMQOptions {
   queues: { [key: string]: IQueue };
   consumers: { [key: string]: IPublish };
   publishers: { [key: string]: IPublish };
+  isGlobal?: boolean;
 }

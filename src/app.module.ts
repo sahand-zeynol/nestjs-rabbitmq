@@ -3,8 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as Joi from '@hapi/joi';
-import * as RMQConfig from './rabbitmq/rabbitmq.config';
 import { RmqModule } from 'nestjs-rabbitmq-sdk';
+import { ExamplesModule } from './examples/examples.module';
+import { RMQConfig } from './rabbitmq/rabbitmq.config';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RmqModule } from 'nestjs-rabbitmq-sdk';
       }),
     }),
     RmqModule.forRoot(RMQConfig),
+    ExamplesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

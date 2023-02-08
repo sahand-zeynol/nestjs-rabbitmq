@@ -1,4 +1,4 @@
-import { IChannel } from '../rmq/interfaces/channel.interface';
+import { IChannel } from 'nestjs-rabbitmq-sdk';
 
 export const channels: { [key: string]: IChannel } = {
   default: {

@@ -1,4 +1,4 @@
-import { IPublish } from '../rmq/interfaces/publishOption.interface';
+import { IPublish } from 'nestjs-rabbitmq-sdk';
 import { channels } from './channel';
 import { queues } from './queue';
 
