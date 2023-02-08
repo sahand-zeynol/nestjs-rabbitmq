@@ -6,8 +6,11 @@ dotenv.config();
 const postfix = process.env.RABBITMQ_POSTFIX;
 
 export const queues: { [key: string]: IQueue } = {
-  ERRORS: {
-    QUEUE_NAME: `errors_${postfix}`,
+  SIMPLE: {
+    QUEUE_NAME: `simple_${postfix}`,
+  },
+  BUNNY_DELAY: {
+    QUEUE_NAME: `bunny_delay_${postfix}`,
     EXCHANGE: exchanges.BUNNY,
     HEADERS: { durable: true },
   },
