@@ -1,7 +1,7 @@
 import { IQueue } from '../rmq/interfaces/queue.interface';
 import { exchanges } from './exchange';
 
-const postfix = 'test';
+const postfix = process.env.RABBITMQ_POSTFIX;
 
 export const queues: { [key: string]: IQueue } = {
   ERRORS: {

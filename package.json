@@ -39,6 +39,7 @@
     "amqp-connection-manager": "^4.1.10",
     "amqplib": "^0.10.3",
     "class-validator": "^0.14.0",
+    "nestjs-rabbitmq-sdk": "^1.0.1",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.2.0"
   },

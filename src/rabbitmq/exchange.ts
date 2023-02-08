@@ -1,6 +1,6 @@
 import { IExchange } from '../rmq/interfaces/exchange.interface';
 
-const postfix = '';
+const postfix = process.env.RABBITMQ_POSTFIX;
 
 export const exchanges: { [key: string]: IExchange } = {
   BUNNY: {

@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RmqModule } from './rmq';
 import * as Joi from '@hapi/joi';
 import * as RMQConfig from './rabbitmq/rabbitmq.config';
+import { RmqModule } from 'nestjs-rabbitmq-sdk';
 
 @Module({
   imports: [
