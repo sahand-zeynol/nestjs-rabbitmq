@@ -5,7 +5,7 @@ import { consumers } from '../rabbitmq/consumer';
 @Injectable()
 export class ConsumersHandler {
   constructor(private readonly rmqService: RmqService) {
-    this.rmqService.on(consumers.ERRORS, async (result) => {
+    this.rmqService.on(consumers.BUNNY_DELAY, async (result) => {
       console.log('BUNNY-DELAY consumed: ', result);
     });
     this.rmqService.on(consumers.SIMPLE, async (result) => {
