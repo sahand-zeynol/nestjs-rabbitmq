@@ -240,17 +240,17 @@ export class RmqService {
   async publish(
     queue: IPublish,
     payload,
-    options?: object | IQueueWithExchange,
+    options?: IQueueWithExchange,
   ) {
     if (queue.QUEUE.hasOwnProperty('EXCHANGE')) {
       return await this.publisher(
         queue,
         payload,
-        (options as IQueueWithExchange)?.delayTime,
+        options,
       );
     }
 
-    return await this.sendToQueue(queue, payload);
+    return await this.sendToQueue(queue, payload, options);
   }
 
   /**
@@ -258,12 +258,8 @@ export class RmqService {
    * @param queue
    * @param payload
    */
-  private async sendToQueue(queue: IPublish, payload) {
+  private async sendToQueue(queue: IPublish, payload, options: IQueueWithExchange = { messageId: uuid(), }) {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
-    const options: Options.Publish = {
-      messageId: uuid(),
-    };
-
     return new Promise((resolve) => {
       confirmedChannel.sendToQueue(
         queue.QUEUE.QUEUE_NAME,
@@ -297,16 +293,15 @@ export class RmqService {
    * @param payload
    * @param delayTime
    */
-  private async publisher(queue: IPublish, payload, delayTime = 0) {
+  private async publisher(queue: IPublish, payload, options: IQueueWithExchange = { messageId: uuid(), }) {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
-    let headers: { [k: string]: any } = {};
     switch (queue.QUEUE.EXCHANGE.type) {
       case this.configExchanges.BUNNY.type: {
-        headers = { 'x-delay': delayTime };
+        options.headers = { 'x-delay': options?.delayTime | 0 };
         break;
       }
       case this.configExchanges.SINGLE_ACTIVE.type: {
-        headers = { 'x-single-active-consumer': true };
+        options.headers = { 'x-single-active-consumer': true };
         break;
       }
       default: {
@@ -319,10 +314,7 @@ export class RmqService {
         queue.QUEUE.EXCHANGE.name,
         queue.QUEUE.QUEUE_NAME,
         Buffer.from(JSON.stringify([payload])),
-        {
-          messageId: uuid(),
-          headers,
-        },
+        options,
         async (err, ok) => {
           if (err) {
             console.log(err);
