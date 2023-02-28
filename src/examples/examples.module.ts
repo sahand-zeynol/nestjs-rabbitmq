@@ -5,11 +5,7 @@ import { SimplePublisher } from './simple.publisher.service';
 
 @Module({
   imports: [],
-  providers: [
-    ConsumersHandler,
-    BunnyDelayPublisher,
-    SimplePublisher
-  ],
+  providers: [ConsumersHandler, BunnyDelayPublisher, SimplePublisher],
   exports: [],
 })
-export class ExamplesModule { }
+export class ExamplesModule {}

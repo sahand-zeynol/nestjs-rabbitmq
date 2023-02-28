@@ -11,4 +11,5 @@ export interface IRMQOptions {
   consumers: { [key: string]: IPublish };
   publishers: { [key: string]: IPublish };
   isGlobal?: boolean;
+  consumerRetry?: number;
 }
