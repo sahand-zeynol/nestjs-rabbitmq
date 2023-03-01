@@ -40,7 +40,7 @@
     "amqplib": "^0.10.3",
     "class-validator": "^0.14.0",
     "dotenv": "^16.0.3",
-    "nestjs-rabbitmq-sdk": "^1.0.6",
+    "nestjs-rabbitmq-sdk": "^1.0.7",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.2.0"
   },

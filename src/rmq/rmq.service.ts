@@ -3,12 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { CACHE_MANAGER, Inject, Injectable } from '@nestjs/common';
 import { delay, isNil } from './helpers';
 import { IRMQOptions } from './interfaces/rmq.service.options';
-import {
-  IChannel,
-  IExchange,
-  IPublish,
-  IQueueWithExchange,
-} from './interfaces';
+import { IChannel, IExchange, IPublish, PublishOptions } from './interfaces';
 import { Cache } from 'cache-manager';
 
 @Injectable()
@@ -241,17 +236,9 @@ export class RmqService {
    * @param payload
    * @param options
    */
-  async publish(
-    queue: IPublish,
-    payload,
-    options?: IQueueWithExchange,
-  ) {
+  async publish(queue: IPublish, payload, options?: PublishOptions) {
     if (queue.QUEUE.hasOwnProperty('EXCHANGE')) {
-      return await this.publisher(
-        queue,
-        payload,
-        options,
-      );
+      return await this.publisher(queue, payload, options);
     }
 
     return await this.sendToQueue(queue, payload, options);
@@ -262,7 +249,11 @@ export class RmqService {
    * @param queue
    * @param payload
    */
-  private async sendToQueue(queue: IPublish, payload, options: IQueueWithExchange = { messageId: uuid(), }) {
+  private async sendToQueue(
+    queue: IPublish,
+    payload,
+    options: PublishOptions = { messageId: uuid() },
+  ) {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
     return new Promise((resolve) => {
       confirmedChannel.sendToQueue(
@@ -286,7 +277,11 @@ export class RmqService {
    * @param payload
    * @param delayTime
    */
-  private async publisher(queue: IPublish, payload, options: IQueueWithExchange = { messageId: uuid(), }) {
+  private async publisher(
+    queue: IPublish,
+    payload,
+    options: PublishOptions = { messageId: uuid() },
+  ) {
     const confirmedChannel = this.channels[queue.CHANNEL_NAME];
     switch (queue.QUEUE.EXCHANGE.type) {
       case this.configExchanges.BUNNY.type: {
