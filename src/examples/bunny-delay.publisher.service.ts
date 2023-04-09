@@ -10,7 +10,7 @@ export class BunnyDelayPublisher implements OnModuleInit {
   async onModuleInit() {
     await delay(5000);
     await this.rmqService.publish(publishers.BUNNY_DELAY, 'Bunny-delay', {
-      delayTime: 30 * 1000,
+      delayTime: 5000,
     });
   }
 }
