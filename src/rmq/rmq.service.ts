@@ -1,6 +1,6 @@
-import { Channel, ConfirmChannel, connect, Connection, Options } from 'amqplib';
+import { Channel, ConfirmChannel, connect, Connection } from 'amqplib';
 import { v4 as uuid } from 'uuid';
-import { CACHE_MANAGER, Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { delay, isNil } from './helpers';
 import { IRMQOptions } from './interfaces/rmq.service.options';
 import { IChannel, IExchange, IPublish, PublishOptions } from './interfaces';
@@ -22,10 +22,7 @@ export class RmqService {
    * Constructor
    * @param options
    */
-  constructor(
-    private options: IRMQOptions,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {
+  constructor(private options: IRMQOptions, private cacheManager: Cache) {
     this.consumerRetry = options.consumerRetry;
     this.configChannels = options.channels;
     this.configExchanges = options.exchanges;
@@ -343,7 +340,10 @@ export class RmqService {
         const consumeErrorCount = await this.cacheManager.get(
           result.properties.messageId,
         );
-        if (this.consumerRetry && consumeErrorCount > this.consumerRetry) {
+        if (
+          this.consumerRetry &&
+          (consumeErrorCount as number) > this.consumerRetry
+        ) {
           console.log(
             `Error in consumer ${queue.QUEUE.QUEUE_NAME} with message: `,
             result,

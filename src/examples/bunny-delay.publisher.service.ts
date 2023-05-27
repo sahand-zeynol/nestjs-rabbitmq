@@ -5,7 +5,7 @@ import { publishers } from '../rabbitmq/publisher';
 
 @Injectable()
 export class BunnyDelayPublisher implements OnModuleInit {
-  constructor(private readonly rmqService: RmqService) { }
+  constructor(private readonly rmqService: RmqService) {}
 
   async onModuleInit() {
     await delay(5000);
